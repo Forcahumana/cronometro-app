@@ -1,25 +1,101 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Timer } from '@/types/timer';
+import { Timer, TimerDB } from '@/types/timer';
+import { supabase } from '@/lib/supabase';
+
+// Converter de DB para App
+const dbToTimer = (dbTimer: TimerDB): Timer => ({
+  id: dbTimer.id,
+  name: dbTimer.name,
+  totalSeconds: dbTimer.total_seconds,
+  remainingSeconds: dbTimer.remaining_seconds,
+  status: dbTimer.status,
+  created_at: dbTimer.created_at,
+  updated_at: dbTimer.updated_at,
+});
 
 export default function ProjectionPage() {
   const [timers, setTimers] = useState<Timer[]>([]);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
 
   useEffect(() => {
-    const loadTimers = () => {
-      const saved = localStorage.getItem('timers');
-      if (saved) {
-        setTimers(JSON.parse(saved));
+    // Inicializar o relógio apenas no cliente
+    setCurrentTime(new Date());
+  }, []);
+
+  useEffect(() => {
+    // Carregar timers do Supabase
+    const loadTimers = async () => {
+      const { data, error } = await supabase
+        .from('timers')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao carregar cronómetros na projeção:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('Projeção: Cronómetros carregados:', data.length);
+        setTimers(data.map(dbToTimer));
+        setLastUpdate(Date.now());
       }
     };
 
     loadTimers();
-    const interval = setInterval(loadTimers, 500);
+
+    // Recarregar a cada 2 segundos como fallback
+    const pollInterval = setInterval(loadTimers, 2000);
+
+    // Subscrever a mudanças em tempo real
+    const channel = supabase
+      .channel('projection-timers')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'timers' },
+        (payload) => {
+          console.log('Projeção: Atualização recebida:', payload);
+          loadTimers();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Status da subscrição Realtime:', status);
+      });
+
+    return () => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Atualizar localmente os cronómetros em execução
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimers((currentTimers) => {
+        const now = Date.now();
+        // Só atualiza localmente se não houve atualização do servidor recentemente
+        if (now - lastUpdate < 500) {
+          return currentTimers;
+        }
+        
+        return currentTimers.map((timer) => {
+          if (timer.status === 'running' && timer.remainingSeconds > 0) {
+            const newRemaining = timer.remainingSeconds - 1;
+            return {
+              ...timer,
+              remainingSeconds: newRemaining,
+              status: newRemaining === 0 ? 'finished' as const : 'running' as const,
+            };
+          }
+          return timer;
+        });
+      });
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [lastUpdate]);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -41,7 +117,7 @@ export default function ProjectionPage() {
 
   const getTimerBorder = (timer: Timer) => {
     if (timer.status === 'finished') return 'border-rose-400 shadow-rose-400/50';
-    if (timer.status === 'running') return 'border-cyan-400 shadow-cyan-400/50 animate-pulse';
+    if (timer.status === 'running') return 'border-cyan-400 shadow-cyan-400/50';
     return 'border-slate-500';
   };
 
@@ -55,8 +131,8 @@ export default function ProjectionPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 p-8 relative overflow-hidden">
       {/* Background animated circles */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
       </div>
 
       {/* Header */}
@@ -70,10 +146,10 @@ export default function ProjectionPage() {
           </div>
           <div className="text-center lg:text-right">
             <div className="text-3xl md:text-4xl lg:text-5xl font-bold text-white font-mono">
-              {currentTime.toLocaleTimeString('pt-PT')}
+              {currentTime ? currentTime.toLocaleTimeString('pt-PT') : '--:--:--'}
             </div>
             <div className="text-gray-400 text-xs md:text-sm whitespace-nowrap">
-              {currentTime.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {currentTime ? currentTime.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Carregando...'}
             </div>
           </div>
         </div>
@@ -125,7 +201,7 @@ export default function ProjectionPage() {
                     width: `${((timer.totalSeconds - timer.remainingSeconds) / timer.totalSeconds) * 100}%`
                   }}
                 >
-                  <div className="h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
+                  <div className="h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
                 </div>
               </div>
 
@@ -138,12 +214,12 @@ export default function ProjectionPage() {
 
             {/* Glow Effect for Running Timers */}
             {timer.status === 'running' && (
-              <div className="absolute inset-0 rounded-2xl bg-cyan-500/20 blur-xl -z-10 animate-pulse"></div>
+              <div className="absolute inset-0 rounded-2xl bg-cyan-500/20 blur-xl -z-10"></div>
             )}
             
             {/* Glow Effect for Finished Timers */}
             {timer.status === 'finished' && (
-              <div className="absolute inset-0 rounded-2xl bg-rose-500/20 blur-xl -z-10 animate-pulse"></div>
+              <div className="absolute inset-0 rounded-2xl bg-rose-500/20 blur-xl -z-10"></div>
             )}
           </div>
         ))}
@@ -152,7 +228,7 @@ export default function ProjectionPage() {
       {/* Empty State */}
       {timers.length === 0 && (
         <div className="relative z-10 flex flex-col items-center justify-center min-h-[60vh]">
-          <div className="text-9xl mb-8 animate-bounce">⏱️</div>
+          <div className="text-9xl mb-8">⏱️</div>
           <h2 className="text-4xl font-bold text-gray-400 mb-4">Nenhum Cronómetro Ativo</h2>
           <p className="text-xl text-gray-500">Adicione cronómetros na página de controlo para começar</p>
         </div>

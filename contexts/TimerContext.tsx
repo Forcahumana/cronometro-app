@@ -85,9 +85,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     intervalRef.current = setInterval(async () => {
       setTimers((prevTimers) => {
         const updatedTimers = prevTimers.map((timer) => {
-          if (timer.status === 'running' && timer.remainingSeconds > 0) {
+          if (timer.status === 'running') {
             const newRemaining = timer.remainingSeconds - 1;
-            const newStatus: Timer['status'] = newRemaining === 0 ? 'finished' : 'running';
+            const newStatus: Timer['status'] = 'running'; // Mantém sempre 'running', não muda para 'finished'
             
             // Atualizar no Supabase
             supabase

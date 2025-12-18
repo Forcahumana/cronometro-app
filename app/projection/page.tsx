@@ -81,12 +81,12 @@ export default function ProjectionPage() {
         }
         
         return currentTimers.map((timer) => {
-          if (timer.status === 'running' && timer.remainingSeconds > 0) {
+          if (timer.status === 'running') {
             const newRemaining = timer.remainingSeconds - 1;
             return {
               ...timer,
               remainingSeconds: newRemaining,
-              status: newRemaining === 0 ? 'finished' as const : 'running' as const,
+              status: 'running' as const, // Mantém sempre 'running'
             };
           }
           return timer;
@@ -103,13 +103,17 @@ export default function ProjectionPage() {
   }, []);
 
   const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    const isNegative = seconds < 0;
+    const absSeconds = Math.abs(seconds);
+    const h = Math.floor(absSeconds / 3600);
+    const m = Math.floor((absSeconds % 3600) / 60);
+    const s = absSeconds % 60;
+    const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return isNegative ? `-${time}` : time;
   };
 
   const getTimerColor = (timer: Timer) => {
+    if (timer.remainingSeconds < 0) return 'from-red-600 to-red-800'; // Vermelho para tempo negativo
     if (timer.status === 'finished') return 'from-rose-500 to-pink-600';
     if (timer.status === 'running') return 'from-cyan-500 to-blue-600';
     return 'from-slate-600 to-slate-800';

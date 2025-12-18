@@ -19,20 +19,28 @@ export default function TimerCard({ timer, showControls = true }: TimerCardProps
   };
 
   const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    const isNegative = seconds < 0;
+    const absSeconds = Math.abs(seconds);
+    const h = Math.floor(absSeconds / 3600);
+    const m = Math.floor((absSeconds % 3600) / 60);
+    const s = absSeconds % 60;
+    const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return isNegative ? `-${time}` : time;
   };
 
   const getStatusColor = () => {
+    if (timer.remainingSeconds < 0) return 'bg-red-600'; // Vermelho escuro para negativo
     if (timer.status === 'finished') return 'bg-red-500';
     if (timer.status === 'running') return 'bg-green-500';
     return 'bg-gray-500';
   };
 
   return (
-    <div className={`p-6 rounded-lg border-2 ${timer.status === 'finished' ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white'}`}>
+    <div className={`p-6 rounded-lg border-2 ${
+      timer.remainingSeconds < 0 ? 'border-red-600 bg-red-100' :
+      timer.status === 'finished' ? 'border-red-500 bg-red-50' : 
+      'border-gray-300 bg-white'
+    }`}>
       <div className="flex justify-between items-start mb-4">
         <h3 className="text-xl font-bold text-gray-800">{timer.name}</h3>
         <span className={`px-3 py-1 rounded-full text-white text-sm ${getStatusColor()}`}>

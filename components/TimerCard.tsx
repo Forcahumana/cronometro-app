@@ -25,7 +25,7 @@ export default function TimerCard({ timer, showControls = true }: TimerCardProps
     updateTimer: () => {},
   };
 
-  const openEditModal = () => {
+  const openEditMode = () => {
     const absSeconds = Math.abs(timer.remainingSeconds);
     const h = Math.floor(absSeconds / 3600);
     const m = Math.floor((absSeconds % 3600) / 60);
@@ -39,6 +39,10 @@ export default function TimerCard({ timer, showControls = true }: TimerCardProps
   const handleSaveEdit = async () => {
     const totalSeconds = editHours * 3600 + editMinutes * 60 + editSeconds;
     await updateTimer(timer.id, totalSeconds);
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
     setIsEditing(false);
   };
 
@@ -72,108 +76,96 @@ export default function TimerCard({ timer, showControls = true }: TimerCardProps
         </span>
       </div>
       
-      <div className="text-5xl font-mono font-bold text-center my-6 text-gray-900">
-        {formatTime(timer.remainingSeconds)}
-      </div>
-
-      {showControls && (
-        <>
-          <div className="flex gap-2 mt-4">
-            {timer.status === 'running' ? (
-              <button
-                onClick={() => pauseTimer(timer.id)}
-                className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
-              >
-                Pausar
-              </button>
-            ) : (
-              <button
-                onClick={() => startTimer(timer.id)}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-                disabled={timer.status === 'finished'}
-              >
-                Iniciar
-              </button>
-            )}
+      {isEditing ? (
+        <div className="my-6">
+          <div className="flex justify-center items-center gap-2 text-2xl font-mono font-bold">
+            <input
+              type="number"
+              min="0"
+              max="99"
+              value={editHours}
+              onChange={(e) => setEditHours(parseInt(e.target.value) || 0)}
+              className="w-20 text-center border-2 border-blue-500 rounded px-2 py-1"
+            />
+            <span>:</span>
+            <input
+              type="number"
+              min="0"
+              max="59"
+              value={editMinutes}
+              onChange={(e) => setEditMinutes(parseInt(e.target.value) || 0)}
+              className="w-20 text-center border-2 border-blue-500 rounded px-2 py-1"
+            />
+            <span>:</span>
+            <input
+              type="number"
+              min="0"
+              max="59"
+              value={editSeconds}
+              onChange={(e) => setEditSeconds(parseInt(e.target.value) || 0)}
+              className="w-20 text-center border-2 border-blue-500 rounded px-2 py-1"
+            />
+          </div>
+          <div className="flex gap-2 mt-4 justify-center">
             <button
-              onClick={() => resetTimer(timer.id)}
-              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+              onClick={handleSaveEdit}
+              className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded"
             >
-              Reiniciar
+              ✓ Guardar
             </button>
             <button
-              onClick={openEditModal}
+              onClick={handleCancelEdit}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded"
+            >
+              ✕ Cancelar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="text-5xl font-mono font-bold text-center my-6 text-gray-900">
+          {formatTime(timer.remainingSeconds)}
+        </div>
+      )}
+
+      {showControls && (
+        <div className="flex gap-2 mt-4">
+          {timer.status === 'running' ? (
+            <button
+              onClick={() => pauseTimer(timer.id)}
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
+            >
+              Pausar
+            </button>
+          ) : (
+            <button
+              onClick={() => startTimer(timer.id)}
+              className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+              disabled={timer.status === 'finished'}
+            >
+              Iniciar
+            </button>
+          )}
+          <button
+            onClick={() => resetTimer(timer.id)}
+            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+          >
+            Reiniciar
+          </button>
+          {!isEditing && (
+            <button
+              onClick={openEditMode}
               className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded"
             >
               ✏️
             </button>
-            <button
-              onClick={() => removeTimer(timer.id)}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
-            >
-              Remover
-            </button>
-          </div>
-
-          {/* Modal de Edição */}
-          {isEditing && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 w-96">
-                <h3 className="text-xl font-bold mb-4">Editar Tempo</h3>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Horas</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={editHours}
-                      onChange={(e) => setEditHours(parseInt(e.target.value) || 0)}
-                      className="w-full border rounded px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Minutos</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="59"
-                      value={editMinutes}
-                      onChange={(e) => setEditMinutes(parseInt(e.target.value) || 0)}
-                      className="w-full border rounded px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Segundos</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="59"
-                      value={editSeconds}
-                      onChange={(e) => setEditSeconds(parseInt(e.target.value) || 0)}
-                      className="w-full border rounded px-3 py-2"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2 mt-6">
-                  <button
-                    onClick={handleSaveEdit}
-                    className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-                  >
-                    Guardar
-                  </button>
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            </div>
           )}
-        </>
+          <button
+            onClick={() => removeTimer(timer.id)}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+          >
+            Remover
+          </button>
+        </div>
       )}
     </div>
   );

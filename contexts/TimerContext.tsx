@@ -11,6 +11,7 @@ interface TimerContextType {
   startTimer: (id: string) => Promise<void>;
   pauseTimer: (id: string) => Promise<void>;
   resetTimer: (id: string) => Promise<void>;
+  updateTimer: (id: string, newSeconds: number) => Promise<void>;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
@@ -216,9 +217,29 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const updateTimer = async (id: string, newSeconds: number) => {
+    const { error } = await supabase
+      .from('timers')
+      .update({
+        remaining_seconds: newSeconds,
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Erro ao atualizar tempo:', error);
+      return;
+    }
+
+    setTimers((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, remainingSeconds: newSeconds } : t
+      )
+    );
+  };
+
   return (
     <TimerContext.Provider
-      value={{ timers, addTimer, removeTimer, startTimer, pauseTimer, resetTimer }}
+      value={{ timers, addTimer, removeTimer, startTimer, pauseTimer, resetTimer, updateTimer }}
     >
       {children}
     </TimerContext.Provider>
